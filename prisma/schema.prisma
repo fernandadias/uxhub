@@ -1,0 +1,42 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  analyses  HeuristicAnalysis[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model HeuristicAnalysis {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  screenshots Screenshot[]
+  context   Json
+  violations Json
+  status    String   @default("processing")
+  createdAt DateTime @default(now())
+  completedAt DateTime?
+}
+
+model Screenshot {
+  id        String   @id @default(cuid())
+  analysisId String
+  analysis  HeuristicAnalysis @relation(fields: [analysisId], references: [id])
+  url       String
+  order     Int
+  description String?
+  createdAt DateTime @default(now())
+} 
