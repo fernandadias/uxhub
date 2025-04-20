@@ -2,20 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+@import './variables.css';
+
 :root {
   --foreground-rgb: 255, 255, 255;
   --background-rgb: 10, 10, 10;
   --card-border-rgb: 45, 45, 45;
   --text-secondary-rgb: 156, 163, 175;
   --card-background: #1f1e20;
-  --primary-color: #A8E80E;
+  --primary-color: var(--colors-primary);
 }
 
 *, ::before, ::after {
   box-sizing: border-box;
   border-width: 0;
   border-style: solid;
-  border-color: #e5e7eb;
+  border-color: var(--colors-border);
 }
 
 body {
@@ -27,7 +29,7 @@ body {
 
 @layer base {
   p {
-    @apply text-[.875rem] leading-[1.25rem] text-[#9ca3af];
+    @apply text-[var(--typography-body)] leading-[1.25rem] text-[var(--colors-text-secondary)];
   }
 }
 
@@ -37,10 +39,10 @@ body {
   }
 
   .button-style {
-    @apply bg-white/10 rounded-lg border border-[rgb(45,45,45)] text-white px-4 py-2 transition-colors duration-200 hover:bg-white/20;
+    @apply bg-white/10 rounded-lg border border-[var(--colors-border)] text-white px-4 py-2 transition-colors duration-[var(--transition-duration)] hover:bg-white/20;
   }
 
   .card-hover {
-    @apply transition-all duration-200 hover:border-[#A8E80E] hover:shadow-[0_0_0_1px_rgba(168,232,14,0.1)];
+    @apply transition-all duration-[var(--transition-duration)] hover:border-[var(--colors-primary)] hover:shadow-[0_0_0_1px_rgba(168,232,14,0.1)];
   }
 } 
