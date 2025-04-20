@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { FiHome, FiPlus, FiList, FiSettings, FiLogOut } from 'react-icons/fi';
+import { useAuth } from '@/hooks/useAuth';
 
 const menuItems = [
   { name: 'Hub de Ferramentas', path: '/', icon: FiHome },
@@ -17,11 +18,12 @@ const menuItems = [
 export function Sidebar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const { signOut } = useAuth();
 
   return (
     <>
       {/* Mobile header */}
-      <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-[#1c1c1d] border-b border-[rgb(45,45,45)] z-50 flex items-center justify-between px-4">
+      <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-[#1c1c1d] border-b border-[#2d2d2d] z-50 flex items-center justify-between px-4">
         <Image
           src="/images/logo.png"
           alt="UX na Real"
@@ -30,7 +32,7 @@ export function Sidebar() {
           className="h-6 w-auto"
         />
         <button
-          className="p-2 rounded-lg bg-white/10 border border-[rgb(45,45,45)]"
+          className="p-2 rounded-lg bg-white/10 border border-[#2d2d2d]"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         >
           <svg
@@ -51,11 +53,11 @@ export function Sidebar() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full w-64 bg-[#1c1c1d] border-r border-[rgb(45,45,45)] transform transition-transform duration-200 ease-in-out ${
+        className={`fixed top-0 left-0 h-full w-64 bg-[#1c1c1d] border-r border-[#2d2d2d] transform transition-transform duration-200 ease-in-out ${
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-        } md:translate-x-0 z-40`}
+        } md:translate-x-0 md:relative z-40`}
       >
-        <div className="flex flex-col h-full p-4">
+        <div className="flex flex-col h-full p-4 pt-20 md:pt-4">
           <div className="mb-8 md:block hidden">
             <Image
               src="/images/logo.png"
@@ -89,10 +91,12 @@ export function Sidebar() {
             </ul>
           </nav>
 
-          <div className="mt-auto pt-4 border-t border-[rgb(45,45,45)]">
+          <div className="mt-auto pt-4">
             <div className="mb-4">
-              <p className="text-[#9ca3af] text-sm">Plano Atual</p>
-              <p className="text-white font-medium">Premium</p>
+              <p className="text-[#9ca3af] text-sm">
+                Plano: <span className="text-white text-sm">Premium</span>
+              </p>
+
               <div className="w-full bg-white/10 h-2 rounded-full mt-2">
                 <div className="w-3/4 bg-[#A8E80E] h-full rounded-full"></div>
               </div>
@@ -100,24 +104,25 @@ export function Sidebar() {
 
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-                <span className="text-white">FG</span>
+                <span className="text-white">ND</span>
               </div>
               <div className="flex-1">
-                <p className="text-white text-sm">Fernanda Graças</p>
-                <p className="text-[#9ca3af] text-xs">fernanda@email.com</p>
+                <p className="text-white text-sm">Nanda Dias</p>
+                <p className="text-[#9ca3af] text-xs">uxnareal@gmail.com</p>
               </div>
             </div>
 
             <div className="mt-4 flex justify-end space-x-2">
               <button
-                className="p-2 rounded-lg bg-white/10 border border-[rgb(45,45,45)] hover:bg-white/20 transition-colors duration-200"
+                className="p-2 rounded-lg bg-white/10 border border-[#2d2d2d] hover:bg-white/20 transition-colors duration-200"
                 title="Configurações"
               >
                 <FiSettings className="w-5 h-5 text-white" />
               </button>
               <button
-                className="p-2 rounded-lg bg-white/10 border border-[rgb(45,45,45)] hover:bg-white/20 transition-colors duration-200"
+                className="p-2 rounded-lg bg-white/10 border border-[#2d2d2d] hover:bg-white/20 transition-colors duration-200"
                 title="Sair"
+                onClick={() => signOut()}
               >
                 <FiLogOut className="w-5 h-5 text-white" />
               </button>

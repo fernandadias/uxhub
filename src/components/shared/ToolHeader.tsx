@@ -29,7 +29,7 @@ export function ToolHeader({ title, description, videoUrl }: ToolHeaderProps) {
             href={videoUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#1f1e20] text-white rounded-lg hover:bg-[#2f2e30] transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs bg-[#1f1e20] text-white rounded-lg hover:bg-[#2f2e30] transition-colors"
           >
             <FiPlay className="w-5 h-5" />
             <span>Como usar essa ferramenta?</span>
