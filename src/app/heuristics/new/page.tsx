@@ -14,34 +14,50 @@ import {
   type HeuristicAudit,
   type Screenshot,
   type ProductType,
-  type DeviceType,
-  type KeyInteraction,
-  type FlowType,
+  type Device,
+  type Interaction,
+  type Flow,
+  type AnalysisResult,
+  type ProductTypeOption,
+  type DeviceOption,
+  type InteractionOption,
+  type FlowOption
 } from '@/types/heuristics';
 import { FiMonitor, FiTablet, FiSmartphone, FiUpload, FiCheck, FiAlertCircle, FiLoader, FiX } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
+import { AnalysisService } from '@/services/analysisService';
+import { ANALYSIS_CONFIG } from '@/config/analysis';
 
 type AnalysisStatus = 'idle' | 'processing' | 'completed' | 'failed';
 type AnalysisStep = 'upload' | 'processing' | 'analyzing' | 'generating' | 'completed';
 const stepsOrder: AnalysisStep[] = ['upload', 'processing', 'analyzing', 'generating', 'completed'];
 
 export default function NewHeuristicAudit() {
+  const router = useRouter();
   const [formData, setFormData] = useState<Partial<HeuristicAudit>>({
     projectName: '',
-    productType: productTypes[0],
-    device: devices[0],
-    keyInteraction: keyInteractions[0],
-    flowType: flowTypes[0],
+    productType: productTypes[0].value,
+    device: devices[0].value,
+    interaction: keyInteractions[0].value,
+    flow: flowTypes[0].value,
     screenshots: [],
   });
 
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>('idle');
   const [currentStep, setCurrentStep] = useState<AnalysisStep>('upload');
-  const [analysisResults, setAnalysisResults] = useState<any>(null);
+  const [analysisResults, setAnalysisResults] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [selectedViolation, setSelectedViolation] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const [selectedProductType, setSelectedProductType] = useState<ProductTypeOption>(productTypes[0]);
+  const [selectedDevice, setSelectedDevice] = useState<DeviceOption>(devices[0]);
+  const [selectedInteraction, setSelectedInteraction] = useState<InteractionOption>(keyInteractions[0]);
+  const [selectedFlow, setSelectedFlow] = useState<FlowOption>(flowTypes[0]);
+  const [images, setImages] = useState<File[]>([]);
 
   const handleScreenshotUpload = (type: 'start' | 'iteration' | 'end', urls: string[]) => {
     console.log('Imagens enviadas:', {
@@ -49,14 +65,14 @@ export default function NewHeuristicAudit() {
       urls
     });
 
-    const newScreenshots = urls.map((url, index) => ({
+    const newScreenshots: Screenshot[] = urls.map((url, index) => ({
       id: Math.random().toString(36).substr(2, 9),
       url,
-      order: formData.screenshots?.length || 0 + index,
+      sequence: formData.screenshots?.length || 0 + index,
       type,
     }));
 
-    setFormData((prev) => ({
+    setFormData((prev: Partial<HeuristicAudit>) => ({
       ...prev,
       screenshots: [...(prev.screenshots || []), ...newScreenshots],
     }));
@@ -78,66 +94,72 @@ export default function NewHeuristicAudit() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Verificar se há pelo menos uma imagem em cada etapa
-    const hasStartScreenshot = formData.screenshots?.some(s => s.type === 'start');
-    const hasIterationScreenshot = formData.screenshots?.some(s => s.type === 'iteration');
-    const hasEndScreenshot = formData.screenshots?.some(s => s.type === 'end');
-    
-    if (!hasStartScreenshot || !hasIterationScreenshot || !hasEndScreenshot) {
-      toast.error('Por favor, adicione pelo menos uma imagem em cada etapa do fluxo');
-      return;
-    }
-
+    setIsLoading(true);
     setAnalysisStatus('processing');
-    setError(null);
     updateProgress('processing');
 
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session) {
-        throw new Error('Usuário não autenticado');
+      // No modo MOCK, não exige nome do projeto nem imagens
+      if (!ANALYSIS_CONFIG.useMockData) {
+        if (!projectName) {
+          toast.error('Por favor, informe o nome do projeto');
+          return;
+        }
+
+        if (images.length === 0) {
+          toast.error('Por favor, adicione pelo menos uma imagem em cada etapa do fluxo');
+          return;
+        }
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuário não autenticado');
-
-      const payload = {
-        ...formData,
-        userId: user.id,
-      };
-
-      console.log('Dados sendo enviados para análise:', JSON.stringify(payload, null, 2));
-
-      updateProgress('analyzing');
-
-      const response = await fetch('/api/heuristics/analyze', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify(payload),
+      const analysisService = new AnalysisService({
+        productType: selectedProductType.value,
+        device: selectedDevice.value,
+        interaction: selectedInteraction.value,
+        flow: selectedFlow.value
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Erro na resposta da API:', errorData);
-        throw new Error(errorData.error || 'Erro ao enviar análise');
-      }
-
+      updateProgress('analyzing');
+      const result = await analysisService.analyzeImages(images);
+      
       updateProgress('generating');
-
-      const data = await response.json();
-      setAnalysisResults(data);
+      setAnalysisResults(result);
       setAnalysisStatus('completed');
       updateProgress('completed');
+
+      // No modo MOCK, não salvamos no Supabase
+      if (!ANALYSIS_CONFIG.useMockData) {
+        const { data, error } = await supabase
+          .from('heuristic_audits')
+          .insert({
+            project_name: projectName,
+            product_type: selectedProductType.value,
+            device: selectedDevice.value,
+            interaction: selectedInteraction.value,
+            flow: selectedFlow.value,
+            analysis_result: result,
+            screenshots: formData.screenshots,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+
+        if (error) {
+          throw error;
+        }
+      }
+
       toast.success('Análise concluída com sucesso!');
-    } catch (err) {
-      console.error('Erro ao processar análise:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao processar análise');
+      if (!ANALYSIS_CONFIG.useMockData) {
+        router.push('/heuristics');
+      }
+
+    } catch (error) {
+      console.error('Erro na análise:', error);
+      setError('Erro ao realizar a análise. Tente novamente.');
       setAnalysisStatus('failed');
-      toast.error('Erro ao processar análise');
+      toast.error('Erro ao realizar a análise. Tente novamente.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -171,11 +193,13 @@ export default function NewHeuristicAudit() {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'alta':
+      case 'critical':
         return 'bg-red-500';
-      case 'média':
+      case 'high':
         return 'bg-yellow-500';
-      case 'baixa':
+      case 'medium':
+        return 'bg-orange-500';
+      case 'low':
         return 'bg-green-500';
       default:
         return 'bg-gray-500';
@@ -241,21 +265,20 @@ export default function NewHeuristicAudit() {
                     type="text"
                     id="projectName"
                     className="w-full px-4 py-2 rounded-lg bg-white/10 border border-[rgb(45,45,45)] text-white focus:outline-none focus:border-[#A8E80E] transition-colors duration-200"
-                    value={formData.projectName}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, projectName: e.target.value }))
-                    }
-                    required
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    required={!ANALYSIS_CONFIG.useMockData}
                   />
                 </div>
 
-                <TagInput<ProductType>
+                <TagInput<ProductTypeOption>
                   label="Tipo do Produto"
                   options={productTypes}
-                  value={formData.productType}
-                  onChange={(value) =>
-                    setFormData((prev) => ({ ...prev, productType: value }))
-                  }
+                  value={selectedProductType}
+                  onChange={(value) => {
+                    setSelectedProductType(value);
+                    setFormData(prev => ({ ...prev, productType: value.value }));
+                  }}
                   getOptionLabel={(option) => option.name}
                 />
               </div>
@@ -266,13 +289,14 @@ export default function NewHeuristicAudit() {
               <h2 className="text-xl font-semibold text-white mb-4">Informações da Auditoria</h2>
 
               <div className="space-y-6">
-                <TagInput<DeviceType>
+                <TagInput<DeviceOption>
                   label="Dispositivo"
                   options={devices}
-                  value={formData.device}
-                  onChange={(value) =>
-                    setFormData((prev) => ({ ...prev, device: value }))
-                  }
+                  value={selectedDevice}
+                  onChange={(value) => {
+                    setSelectedDevice(value);
+                    setFormData(prev => ({ ...prev, device: value.value }));
+                  }}
                   getOptionLabel={(option) => option.name}
                   renderOption={(option) => (
                     <div className="flex items-center">
@@ -282,23 +306,25 @@ export default function NewHeuristicAudit() {
                   )}
                 />
 
-                <TagInput<KeyInteraction>
+                <TagInput<InteractionOption>
                   label="Interação Principal"
                   options={keyInteractions}
-                  value={formData.keyInteraction}
-                  onChange={(value) =>
-                    setFormData((prev) => ({ ...prev, keyInteraction: value }))
-                  }
+                  value={selectedInteraction}
+                  onChange={(value) => {
+                    setSelectedInteraction(value);
+                    setFormData(prev => ({ ...prev, interaction: value.value }));
+                  }}
                   getOptionLabel={(option) => option.name}
                 />
 
-                <TagInput<FlowType>
+                <TagInput<FlowOption>
                   label="Tipo de Fluxo"
                   options={flowTypes}
-                  value={formData.flowType}
-                  onChange={(value) =>
-                    setFormData((prev) => ({ ...prev, flowType: value }))
-                  }
+                  value={selectedFlow}
+                  onChange={(value) => {
+                    setSelectedFlow(value);
+                    setFormData(prev => ({ ...prev, flow: value.value }));
+                  }}
                   getOptionLabel={(option) => option.name}
                 />
               </div>
@@ -310,32 +336,51 @@ export default function NewHeuristicAudit() {
                     type="start"
                     onUpload={(urls) => handleScreenshotUpload('start', urls)}
                     label="Tela Inicial"
+                    disabled={ANALYSIS_CONFIG.useMockData}
                   />
                   <ScreenshotUploader
                     type="iteration"
                     onUpload={(urls) => handleScreenshotUpload('iteration', urls)}
                     label="Telas Intermediárias"
+                    disabled={ANALYSIS_CONFIG.useMockData}
                   />
                   <ScreenshotUploader
                     type="end"
                     onUpload={(urls) => handleScreenshotUpload('end', urls)}
                     label="Tela Final"
+                    disabled={ANALYSIS_CONFIG.useMockData}
                   />
                 </div>
               </div>
             </div>
 
+            {!ANALYSIS_CONFIG.useMockData && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Imagens
+                </label>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={(e) => setImages(Array.from(e.target.files || []))}
+                  className="mt-1 block w-full"
+                  required
+                />
+              </div>
+            )}
+
             <div className="flex justify-end">
               <button
                 type="submit"
-                disabled={analysisStatus === 'processing'}
+                disabled={isLoading}
                 className={`px-6 py-3 rounded-lg transition-colors ${
-                  analysisStatus === 'processing'
+                  isLoading
                     ? 'bg-gray-500 cursor-not-allowed'
                     : 'bg-[#A8E80E] hover:bg-[#A8E80E]/90'
                 }`}
               >
-                {analysisStatus === 'processing' ? 'Processando...' : 'Iniciar Auditoria'}
+                {isLoading ? 'Analisando...' : 'Iniciar Auditoria'}
               </button>
             </div>
           </form>
@@ -345,40 +390,71 @@ export default function NewHeuristicAudit() {
         {analysisStatus === 'completed' && analysisResults && (
           <div className="bg-[#1f1e20] rounded-lg p-6 border border-[rgb(45,45,45)]">
             <h2 className="text-xl font-semibold text-white mb-4">Resultados da Análise</h2>
-            <div className="space-y-4">
-              {analysisResults.violations?.map((violation: any, index: number) => (
-                <div key={index} className="p-4 bg-white/5 rounded-lg">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-lg font-medium text-[#A8E80E]">{violation.heuristic}</h3>
-                    <span className={`px-2 py-1 rounded-full text-sm ${
-                      violation.priority === 'alta' ? 'bg-red-500/10 text-red-500' :
-                      violation.priority === 'média' ? 'bg-yellow-500/10 text-yellow-500' :
-                      'bg-green-500/10 text-green-500'
-                    }`}>
-                      {violation.priority.toUpperCase()}
-                    </span>
-                  </div>
-                  <p className="text-white/80 mb-2">{violation.description}</p>
-                  
-                  <button
-                    onClick={() => {
-                      setSelectedViolation(violation);
-                      setIsModalOpen(true);
-                    }}
-                    className="text-[#A8E80E] hover:text-[#A8E80E]/80 text-sm font-medium"
-                  >
-                    Ver localização da violação →
-                  </button>
-                  
-                  <div className="mt-2">
-                    <h4 className="text-sm font-medium text-white mb-1">Sugestões:</h4>
-                    <ul className="list-disc list-inside text-white/60">
-                      {violation.suggestions.map((suggestion: string, i: number) => (
-                        <li key={i}>{suggestion}</li>
-                      ))}
-                    </ul>
-                  </div>
+            
+            {/* Score Geral */}
+            <div className="mb-6 p-4 bg-white/5 rounded-lg">
+              <h3 className="text-lg font-medium text-[#A8E80E] mb-2">Score Geral</h3>
+              <div className="flex items-center gap-4">
+                <div className="text-4xl font-bold text-white">{analysisResults.scores.overall.score}</div>
+                <div>
+                  <div className="text-white font-medium">{analysisResults.scores.overall.descriptor}</div>
+                  <div className="text-white/60 text-sm">{analysisResults.scores.overall.description}</div>
                 </div>
+              </div>
+            </div>
+
+            {/* Scores por Heurística */}
+            <div className="mb-6">
+              <h3 className="text-lg font-medium text-white mb-4">Scores por Heurística</h3>
+              <div className="grid grid-cols-2 gap-4">
+                {Object.entries(analysisResults.scores.byHeuristic).map(([heuristic, score]) => (
+                  <div key={heuristic} className="p-4 bg-white/5 rounded-lg">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="text-sm font-medium text-[#A8E80E]">{heuristic}</h4>
+                      <span className="text-white font-bold">{score.score}</span>
+                    </div>
+                    <div className="text-white/60 text-sm">{score.description}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Violações */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-white mb-4">Violações Encontradas</h3>
+              {analysisResults.analysis.images.map((image) => (
+                image.violations.map((violation, index) => (
+                  <div key={`${image.sequence}-${index}`} className="p-4 bg-white/5 rounded-lg">
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="text-lg font-medium text-[#A8E80E]">{violation.heuristic}</h4>
+                      <span className={`px-2 py-1 rounded-full text-sm ${
+                        violation.severity.level === 'critical' ? 'bg-red-500/10 text-red-500' :
+                        violation.severity.level === 'high' ? 'bg-yellow-500/10 text-yellow-500' :
+                        violation.severity.level === 'medium' ? 'bg-orange-500/10 text-orange-500' :
+                        'bg-green-500/10 text-green-500'
+                      }`}>
+                        {violation.severity.level.toUpperCase()}
+                      </span>
+                    </div>
+                    <p className="text-white/80 mb-2">{violation.description}</p>
+                    <p className="text-white/60 text-sm mb-2">{violation.impact}</p>
+                    
+                    <button
+                      onClick={() => {
+                        setSelectedViolation(violation);
+                        setIsModalOpen(true);
+                      }}
+                      className="text-[#A8E80E] hover:text-[#A8E80E]/80 text-sm font-medium"
+                    >
+                      Ver localização da violação →
+                    </button>
+                    
+                    <div className="mt-2">
+                      <h4 className="text-sm font-medium text-white mb-1">Recomendação:</h4>
+                      <p className="text-white/60">{violation.recommendation}</p>
+                    </div>
+                  </div>
+                ))
               ))}
             </div>
           </div>
@@ -414,18 +490,18 @@ export default function NewHeuristicAudit() {
             
             <div className="relative">
               <img 
-                src={formData.screenshots?.find(s => s.type === selectedViolation.type)?.url} 
+                src={formData.screenshots?.find((s: Screenshot) => s.type === selectedViolation.type)?.url} 
                 alt="Screenshot com violação" 
                 className="rounded-lg w-full"
               />
               {selectedViolation.location && (
                 <div 
-                  className={`absolute border-2 ${getPriorityColor(selectedViolation.priority)} rounded-full`}
+                  className={`absolute border-2 ${getPriorityColor(selectedViolation.severity.level)} rounded-full`}
                   style={{
-                    left: `${selectedViolation.location.x}px`,
-                    top: `${selectedViolation.location.y}px`,
-                    width: '20px',
-                    height: '20px',
+                    left: `${selectedViolation.location.coordinates.x}px`,
+                    top: `${selectedViolation.location.coordinates.y}px`,
+                    width: `${selectedViolation.location.coordinates.width}px`,
+                    height: `${selectedViolation.location.coordinates.height}px`,
                     transform: 'translate(-50%, -50%)'
                   }}
                 />

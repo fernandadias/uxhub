@@ -4,6 +4,7 @@ import { uploadFile, validateImage } from '@/lib/services/upload';
 import toast, { Toaster } from 'react-hot-toast';
 import { DragDropContext, Droppable, Draggable, DropResult, DroppableProvided, DraggableProvided } from '@hello-pangea/dnd';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ScreenshotUploaderProps {
   type: 'start' | 'iteration' | 'end';
@@ -11,6 +12,7 @@ interface ScreenshotUploaderProps {
   onUpload: (urls: string[]) => void;
   onReorder?: (urls: string[]) => void;
   label?: string;
+  disabled?: boolean;
 }
 
 export function ScreenshotUploader({ 
@@ -18,91 +20,92 @@ export function ScreenshotUploader({
   screenshots = [], 
   onUpload,
   onReorder,
-  label
+  label,
+  disabled = false
 }: ScreenshotUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const isMultiple = type === 'iteration';
-  const maxFiles = isMultiple ? 5 : 1;
+  const { isAuthenticated } = useAuth();
+  const maxScreenshots = type === 'start' ? 3 : 5;
+  const canAddMore = screenshots.length < maxScreenshots;
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setIsAuthenticated(!!user);
-    };
-    checkAuth();
-  }, []);
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    
+    e.preventDefault();
+    setIsDragging(false);
+    
+    if (!e.dataTransfer.files.length) return;
+    
+    const files = Array.from(e.dataTransfer.files);
+    await handleUpload(files);
+  };
 
-  const handleUpload = useCallback(async (files: FileList) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) return;
+    
+    if (!e.target.files?.length) return;
+    
+    const files = Array.from(e.target.files);
+    await handleUpload(files);
+  };
+
+  const handleUpload = async (files: File[]) => {
+    if (disabled) return;
+    
     if (!isAuthenticated) {
       toast.error('Você precisa estar autenticado para fazer upload de imagens');
       return;
     }
 
-    if (screenshots.length + files.length > maxFiles) {
-      toast.error(`Você pode enviar no máximo ${maxFiles} ${maxFiles === 1 ? 'imagem' : 'imagens'}`);
+    if (files.length + screenshots.length > maxScreenshots) {
+      toast.error(`Você só pode adicionar até ${maxScreenshots} imagens`);
       return;
     }
 
     setIsUploading(true);
-    const newUrls: string[] = [];
 
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        
-        const validation = validateImage(file);
-        if (!validation.isValid) {
-          toast.error(validation.error || 'Formato de imagem inválido');
-          continue;
-        }
+      const uploadPromises = files.map(async (file) => {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `${type}/${fileName}`;
 
-        try {
-          const url = await uploadFile(file);
-          newUrls.push(url);
-        } catch (error: any) {
-          console.error('Erro ao enviar imagem:', error);
-          toast.error(`Erro ao enviar imagem ${i + 1}: ${error?.message || 'Erro desconhecido'}`);
-          continue;
-        }
-      }
+        const { error: uploadError } = await supabase.storage
+          .from('screenshots')
+          .upload(filePath, file);
 
-      if (newUrls.length > 0) {
-        onUpload([...screenshots, ...newUrls]);
-        toast.success('Imagens enviadas com sucesso!');
-      }
-    } catch (error: any) {
-      console.error('Erro geral no upload:', error);
-      toast.error('Erro ao enviar imagens. Tente novamente.');
+        if (uploadError) throw uploadError;
+
+        const { data } = supabase.storage
+          .from('screenshots')
+          .getPublicUrl(filePath);
+
+        return data.publicUrl;
+      });
+
+      const urls = await Promise.all(uploadPromises);
+      onUpload([...screenshots, ...urls]);
+    } catch (error) {
+      console.error('Error uploading screenshots:', error);
+      toast.error('Erro ao fazer upload das imagens');
     } finally {
       setIsUploading(false);
     }
-  }, [screenshots, maxFiles, onUpload, isAuthenticated]);
+  };
 
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files) {
-      handleUpload(e.dataTransfer.files);
-    }
-  }, [handleUpload]);
-
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    
     e.preventDefault();
     setIsDragging(true);
-  }, []);
+  };
 
-  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
+  const handleDragLeave = () => {
+    if (disabled) return;
+    
     setIsDragging(false);
-  }, []);
-
-  const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      handleUpload(e.target.files);
-    }
-  }, [handleUpload]);
+  };
 
   const removeScreenshot = useCallback((index: number) => {
     const newScreenshots = [...screenshots];
@@ -120,17 +123,15 @@ export function ScreenshotUploader({
     onReorder(items);
   }, [screenshots, onReorder]);
 
-  const canAddMore = screenshots.length < maxFiles;
-
   return (
     <div className="space-y-4">
       <Toaster position="top-right" />
       
       {label && <h3 className="text-lg font-medium text-white">{label}</h3>}
       <div
-        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors
-          ${isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary'}
-          ${!canAddMore || !isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''}`}
+        className={`relative border-2 border-dashed rounded-lg p-6 ${
+          isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+        } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -138,34 +139,44 @@ export function ScreenshotUploader({
         <input
           type="file"
           accept="image/*"
-          multiple={isMultiple}
-          onChange={handleFileInput}
+          multiple
+          onChange={handleFileSelect}
           className="hidden"
           id="screenshot-upload"
-          disabled={!canAddMore || isUploading || !isAuthenticated}
+          disabled={!canAddMore || isUploading || !isAuthenticated || disabled}
         />
-        <label htmlFor="screenshot-upload" className="cursor-pointer">
-          <div className="flex flex-col items-center gap-2">
-            <Upload className="w-8 h-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              {!isAuthenticated 
-                ? 'Faça login para fazer upload de imagens'
-                : isUploading 
-                  ? 'Carregando imagem...' 
-                  : canAddMore 
-                    ? `Arraste ${isMultiple ? 'imagens' : 'uma imagem'} ou clique para selecionar`
-                    : 'Limite máximo de imagens atingido'}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {isMultiple ? `Máximo de ${maxFiles} imagens` : 'Apenas uma imagem'}
-            </p>
+        <label 
+          htmlFor="screenshot-upload" 
+          className={`block text-center ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+        >
+          <div className="space-y-2">
+            <div className="flex justify-center">
+              <Upload className="h-12 w-12 text-gray-400" />
+            </div>
+            <div className="text-sm text-gray-600">
+              {isUploading ? (
+                <span>Enviando imagens...</span>
+              ) : disabled ? (
+                <span>Upload desativado</span>
+              ) : (
+                <>
+                  <span>Arraste imagens aqui ou </span>
+                  <span className="text-blue-600 hover:text-blue-500">
+                    clique para selecionar
+                  </span>
+                </>
+              )}
+            </div>
+            <div className="text-xs text-gray-500">
+              {type === 'start' ? 'Até 3 imagens' : 'Até 5 imagens'}
+            </div>
           </div>
         </label>
       </div>
 
       {screenshots.length > 0 && (
         <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable droppableId="screenshots" isDropDisabled={!isMultiple}>
+          <Droppable droppableId="screenshots" isDropDisabled={!type.includes('iteration')}>
             {(provided: DroppableProvided) => (
               <div
                 {...provided.droppableProps}
@@ -177,7 +188,7 @@ export function ScreenshotUploader({
                     key={url}
                     draggableId={url}
                     index={index}
-                    isDragDisabled={!isMultiple}
+                    isDragDisabled={!type.includes('iteration')}
                   >
                     {(provided: DraggableProvided) => (
                       <div
@@ -190,21 +201,15 @@ export function ScreenshotUploader({
                           alt={`Screenshot ${index + 1}`}
                           className="w-full h-32 object-cover rounded-lg"
                         />
-                        {isMultiple && (
-                          <div
-                            {...provided.dragHandleProps}
-                            className="absolute top-2 left-2 p-1 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
+                        {!disabled && (
+                          <button
+                            type="button"
+                            onClick={() => removeScreenshot(index)}
+                            className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                           >
-                            <GripVertical className="w-4 h-4 text-white" />
-                          </div>
+                            <X className="h-4 w-4" />
+                          </button>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => removeScreenshot(index)}
-                          className="absolute top-2 right-2 p-1 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
-                        >
-                          <X className="w-4 h-4 text-white" />
-                        </button>
                       </div>
                     )}
                   </Draggable>
@@ -214,13 +219,6 @@ export function ScreenshotUploader({
             )}
           </Droppable>
         </DragDropContext>
-      )}
-
-      {isUploading && (
-        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-          <ImageIcon className="w-4 h-4 animate-pulse" />
-          <span>Enviando imagens...</span>
-        </div>
       )}
     </div>
   );

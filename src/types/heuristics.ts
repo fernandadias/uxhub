@@ -97,14 +97,14 @@ export interface AnalysisResult {
   };
 }
 
-export type Screenshot = {
+export interface Screenshot {
   id: string;
   url: string;
   sequence: number;
   type: 'start' | 'iteration' | 'end';
-};
+}
 
-export type Project = {
+export interface HeuristicAudit {
   id: string;
   projectName: string;
   productType: ProductType;
@@ -112,18 +112,14 @@ export type Project = {
   interaction: Interaction;
   flow: Flow;
   screenshots: Screenshot[];
+  analysisResult: AnalysisResult;
   createdAt: string;
   updatedAt: string;
-};
+}
 
-export type HeuristicResult = {
-  id: string;
-  heuristic: string;
-  description: string;
-  severity: Severity['level'];
-  recommendation: string;
-  location: Location;
-};
+export type DeviceType = DeviceOption;
+export type KeyInteraction = InteractionOption;
+export type FlowType = FlowOption;
 
 export const productTypes: ProductTypeOption[] = [
   { id: '1', name: 'Marketplace', example: 'e-commerce, loja virtual', value: 'marketplace' },

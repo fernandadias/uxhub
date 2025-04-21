@@ -1,4 +1,4 @@
-import { AnalysisResult } from '../types/heuristics';
+import { AnalysisResult, AnalysisDimensions } from '../types/heuristics';
 
 // Configuração global do modo de operação
 // Altere este valor para false quando quiser usar a API real
@@ -7,6 +7,12 @@ const USE_MOCK_DATA = true;
 export const ANALYSIS_CONFIG = {
   useMockData: USE_MOCK_DATA,
   mockDelay: 1000, // delay em ms para simular chamada de API
+  defaultDimensions: {
+    productType: 'marketplace',
+    device: 'web',
+    interaction: 'login',
+    flow: 'main'
+  } as AnalysisDimensions
 };
 
 // Dados mockados para desenvolvimento
@@ -14,12 +20,7 @@ export const MOCK_ANALYSIS_RESULT: AnalysisResult = {
   metadata: {
     timestamp: new Date().toISOString(),
     frameworkVersion: '1.0.0',
-    analysisContext: {
-      productType: 'marketplace',
-      device: 'web',
-      interaction: 'login',
-      flow: 'main'
-    }
+    analysisContext: ANALYSIS_CONFIG.defaultDimensions
   },
   scores: {
     overall: {
