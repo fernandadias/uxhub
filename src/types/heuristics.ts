@@ -1,92 +1,151 @@
-export type ProductType = {
+export type ProductType = 'marketplace' | 'social' | 'saas' | 'video' | 'audio' | 'finance';
+export type Device = 'web' | 'tablet' | 'mobile';
+export type Interaction = 'login' | 'onboarding' | 'consultation' | 'edition' | 'purchase' | 'deletion' | 'search' | 'social' | 'personalization' | 'support' | 'navigation' | 'sharing' | 'conclusion';
+export type Flow = 'main' | 'alternative' | 'error' | 'shortcut' | 'exploratory' | 'confirmation' | 'return';
+
+export interface ProductTypeOption {
   id: string;
   name: string;
   example: string;
-};
+  value: ProductType;
+}
 
-export type DeviceType = {
+export interface DeviceOption {
   id: string;
   name: string;
   icon: string;
-};
+  value: Device;
+}
 
-export type KeyInteraction = {
+export interface InteractionOption {
   id: string;
   name: string;
   example: string;
-};
+  value: Interaction;
+}
 
-export type FlowType = {
+export interface FlowOption {
   id: string;
   name: string;
-};
+  value: Flow;
+}
+
+export interface AnalysisDimensions {
+  productType: ProductType;
+  device: Device;
+  interaction: Interaction;
+  flow: Flow;
+}
+
+export interface Coordinates {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface VisualReference {
+  element: string;
+  position: string;
+  context: string;
+}
+
+export interface Location {
+  coordinates: Coordinates;
+  visualReference: VisualReference;
+}
+
+export interface Severity {
+  level: 'critical' | 'high' | 'medium' | 'low';
+  description: string;
+  rationale: string;
+}
+
+export interface HeuristicViolation {
+  heuristic: string;
+  location: Location;
+  severity: Severity;
+  description: string;
+  impact: string;
+  recommendation: string;
+}
+
+export interface ImageAnalysis {
+  sequence: number;
+  type: 'start' | 'iteration' | 'end';
+  violations: HeuristicViolation[];
+}
+
+export interface HeuristicScore {
+  score: number;
+  descriptor: string;
+  description: string;
+}
+
+export interface AnalysisResult {
+  metadata: {
+    timestamp: string;
+    frameworkVersion: string;
+    analysisContext: AnalysisDimensions;
+  };
+  scores: {
+    overall: HeuristicScore;
+    byHeuristic: Record<string, HeuristicScore>;
+  };
+  analysis: {
+    images: ImageAnalysis[];
+  };
+}
 
 export type Screenshot = {
   id: string;
   url: string;
-  order: number;
+  sequence: number;
   type: 'start' | 'iteration' | 'end';
 };
 
-export type HeuristicAudit = {
+export type Project = {
   id: string;
   projectName: string;
   productType: ProductType;
-  device: DeviceType;
-  keyInteraction: KeyInteraction;
-  flowType: FlowType;
+  device: Device;
+  interaction: Interaction;
+  flow: Flow;
   screenshots: Screenshot[];
   createdAt: string;
   updatedAt: string;
 };
 
-export type Severity = 'low' | 'medium' | 'high' | 'critical';
-
 export type HeuristicResult = {
   id: string;
-  title: string;
+  heuristic: string;
   description: string;
-  severity: 'critical' | 'high' | 'medium' | 'low';
-  recommendations: string[];
-  updatedAt: string;
+  severity: Severity['level'];
+  recommendation: string;
+  location: Location;
 };
 
-// Mock data
-export const productTypes: ProductType[] = [
-  { id: '1', name: 'Marketplace', example: 'OLX, mercadoLivre' },
-  { id: '2', name: 'Conteúdo em audio', example: 'Audible, Spotify' },
-  { id: '3', name: 'Conteúdo em video', example: 'Netflix, YouTube' },
-  { id: '4', name: 'SaaS / Web app', example: 'Notion, Canva' },
-  { id: '5', name: 'Rede social', example: 'Instagram, LinkedIn' },
+export const productTypes: ProductTypeOption[] = [
+  { id: '1', name: 'Marketplace', example: 'e-commerce, loja virtual', value: 'marketplace' },
+  { id: '2', name: 'Rede Social', example: 'Facebook, Instagram', value: 'social' },
+  { id: '3', name: 'SaaS/Web App', example: 'Notion, Figma', value: 'saas' },
+  { id: '4', name: 'Conteúdo de Vídeo', example: 'YouTube, Netflix', value: 'video' },
+  { id: '5', name: 'Conteúdo de Áudio', example: 'Spotify, Podcast', value: 'audio' },
+  { id: '6', name: 'Financeiro e Gestão', example: 'Nubank, Conta Azul', value: 'finance' }
 ];
 
-export const devices: DeviceType[] = [
-  { id: '1', name: 'Web', icon: '🌐' },
-  { id: '2', name: 'Tablet', icon: '📱' },
-  { id: '3', name: 'Mobile', icon: '📱' },
+export const devices: DeviceOption[] = [
+  { id: '1', name: 'Web', icon: '🌐', value: 'web' },
+  { id: '2', name: 'Tablet', icon: '📱', value: 'tablet' },
+  { id: '3', name: 'Mobile', icon: '📱', value: 'mobile' }
 ];
 
-export const keyInteractions: KeyInteraction[] = [
-  { id: '1', name: 'Criação', example: 'nova postagem, curso, produto' },
-  { id: '2', name: 'Personalização', example: 'ajustar preferências' },
-  { id: '3', name: 'Exclusão', example: 'conta, produto, comentário' },
-  { id: '4', name: 'Edição', example: 'alterar dados, conteúdo, perfil' },
-  { id: '5', name: 'Login', example: 'autenticação' },
-  { id: '6', name: 'Onboarding', example: 'orientação inicial ou reativação' },
-  { id: '7', name: 'Compra', example: 'checkout, carrinho, pagamento' },
-  { id: '8', name: 'Busca', example: 'pesquisa, filtro, navegação' },
-  { id: '9', name: 'Cadastro', example: 'criação de conta' },
-  { id: '10', name: 'Interação social', example: 'comentar, curtir' },
-  { id: '11', name: 'Envio', example: 'formulário, arquivos, mensagens' },
-  { id: '12', name: 'Solicitação de suporte', example: '' },
-  { id: '13', name: 'Consulta/Leitura', example: 'ver conteúdo, relatório' },
+export const keyInteractions: InteractionOption[] = [
+  { id: '1', name: 'Criação', example: 'nova postagem, curso, produto', value: 'edition' },
+  { id: '2', name: 'Personalização', example: 'ajustar preferências', value: 'personalization' }
 ];
 
-export const flowTypes: FlowType[] = [
-  { id: '1', name: 'Principal / sucesso' },
-  { id: '2', name: 'Alternativo / exceção' },
-  { id: '3', name: 'Erro / bloqueio' },
-  { id: '4', name: 'Exploratório' },
-  { id: '5', name: 'Retorno / recuperação' },
-  { id: '6', name: 'Atalho ou acelerado' },
+export const flowTypes: FlowOption[] = [
+  { id: '1', name: 'Principal / sucesso', value: 'main' },
+  { id: '2', name: 'Alternativo / exceção', value: 'alternative' }
 ]; 
