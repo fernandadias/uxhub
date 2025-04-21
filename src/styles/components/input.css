@@ -1,0 +1,33 @@
+@layer components {
+  .input {
+    @apply flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .input-error {
+    @apply border-destructive focus-visible:ring-destructive;
+  }
+
+  .input-success {
+    @apply border-success focus-visible:ring-success;
+  }
+
+  .input-warning {
+    @apply border-warning focus-visible:ring-warning;
+  }
+
+  .input-sm {
+    @apply h-8 text-xs;
+  }
+
+  .input-lg {
+    @apply h-12 text-base;
+  }
+
+  .input-disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+
+  .input-readonly {
+    @apply cursor-default bg-muted/50;
+  }
+} 

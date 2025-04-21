@@ -3,46 +3,49 @@
 @tailwind utilities;
 
 @import './variables.css';
-
-:root {
-  --foreground-rgb: 255, 255, 255;
-  --background-rgb: 10, 10, 10;
-  --card-border-rgb: 45, 45, 45;
-  --text-secondary-rgb: 156, 163, 175;
-  --card-background: #1f1e20;
-  --primary-color: var(--colors-primary);
-}
-
-*, ::before, ::after {
-  box-sizing: border-box;
-  border-width: 0;
-  border-style: solid;
-  border-color: var(--colors-border);
-}
-
-body {
-  color: rgb(var(--foreground-rgb));
-  background-color: rgb(var(--background-rgb));
-  min-height: 100vh;
-  font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", Segoe UI Symbol, "Noto Color Emoji";
-}
+@import './components/button.css';
+@import './components/input.css';
+@import './components/card.css';
 
 @layer base {
-  p {
-    @apply text-[var(--typography-body)] leading-[1.25rem] text-[var(--colors-text-secondary)];
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
   }
 }
 
 @layer components {
-  .card-gradient {
-    background: var(--card-background);
+  .container {
+    @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8;
   }
 
-  .button-style {
-    @apply bg-white/10 rounded-lg border border-[var(--colors-border)] text-white px-4 py-2 transition-colors duration-[var(--transition-duration)] hover:bg-white/20;
+  .section {
+    @apply py-12 sm:py-16;
   }
 
-  .card-hover {
-    @apply transition-all duration-[var(--transition-duration)] hover:border-[var(--colors-primary)] hover:shadow-[0_0_0_1px_rgba(168,232,14,0.1)];
+  .heading-1 {
+    @apply scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl;
+  }
+
+  .heading-2 {
+    @apply scroll-m-20 pb-2 text-3xl font-semibold tracking-tight transition-colors first:mt-0;
+  }
+
+  .heading-3 {
+    @apply scroll-m-20 text-2xl font-semibold tracking-tight;
+  }
+
+  .heading-4 {
+    @apply scroll-m-20 text-xl font-semibold tracking-tight;
+  }
+
+  .paragraph {
+    @apply leading-7 [&:not(:first-child)]:mt-6;
+  }
+
+  .list {
+    @apply my-6 ml-6 list-disc [&>li]:mt-2;
   }
 } 

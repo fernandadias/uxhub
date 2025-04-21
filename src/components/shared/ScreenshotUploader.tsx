@@ -1,8 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Upload, X, Image as ImageIcon, GripVertical } from 'lucide-react';
-import { uploadImage, validateImage } from '@/services/upload';
+import { uploadFile, validateImage } from '@/lib/services/upload';
 import toast, { Toaster } from 'react-hot-toast';
 import { DragDropContext, Droppable, Draggable, DropResult, DroppableProvided, DraggableProvided } from '@hello-pangea/dnd';
+import { supabase } from '@/lib/supabase';
 
 interface ScreenshotUploaderProps {
   type: 'start' | 'iteration' | 'end';
@@ -21,10 +22,24 @@ export function ScreenshotUploader({
 }: ScreenshotUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const isMultiple = type === 'iteration';
   const maxFiles = isMultiple ? 5 : 1;
 
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsAuthenticated(!!user);
+    };
+    checkAuth();
+  }, []);
+
   const handleUpload = useCallback(async (files: FileList) => {
+    if (!isAuthenticated) {
+      toast.error('Você precisa estar autenticado para fazer upload de imagens');
+      return;
+    }
+
     if (screenshots.length + files.length > maxFiles) {
       toast.error(`Você pode enviar no máximo ${maxFiles} ${maxFiles === 1 ? 'imagem' : 'imagens'}`);
       return;
@@ -44,7 +59,7 @@ export function ScreenshotUploader({
         }
 
         try {
-          const url = await uploadImage(file);
+          const url = await uploadFile(file);
           newUrls.push(url);
         } catch (error: any) {
           console.error('Erro ao enviar imagem:', error);
@@ -63,7 +78,7 @@ export function ScreenshotUploader({
     } finally {
       setIsUploading(false);
     }
-  }, [screenshots, maxFiles, onUpload]);
+  }, [screenshots, maxFiles, onUpload, isAuthenticated]);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -115,7 +130,7 @@ export function ScreenshotUploader({
       <div
         className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors
           ${isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary'}
-          ${!canAddMore ? 'opacity-50 cursor-not-allowed' : ''}`}
+          ${!canAddMore || !isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''}`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -127,17 +142,19 @@ export function ScreenshotUploader({
           onChange={handleFileInput}
           className="hidden"
           id="screenshot-upload"
-          disabled={!canAddMore || isUploading}
+          disabled={!canAddMore || isUploading || !isAuthenticated}
         />
         <label htmlFor="screenshot-upload" className="cursor-pointer">
           <div className="flex flex-col items-center gap-2">
             <Upload className="w-8 h-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              {isUploading 
-                ? 'Carregando imagem...' 
-                : canAddMore 
-                  ? `Arraste ${isMultiple ? 'imagens' : 'uma imagem'} ou clique para selecionar`
-                  : 'Limite máximo de imagens atingido'}
+              {!isAuthenticated 
+                ? 'Faça login para fazer upload de imagens'
+                : isUploading 
+                  ? 'Carregando imagem...' 
+                  : canAddMore 
+                    ? `Arraste ${isMultiple ? 'imagens' : 'uma imagem'} ou clique para selecionar`
+                    : 'Limite máximo de imagens atingido'}
             </p>
             <p className="text-xs text-muted-foreground">
               {isMultiple ? `Máximo de ${maxFiles} imagens` : 'Apenas uma imagem'}
